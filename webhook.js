@@ -10,6 +10,16 @@ export default async (commandType, commandValue) => {
     const uuid = await fsp.readFile(`${__dirname}\\uuid`, 'utf8')
     const webhookUrl = await fsp.readFile(`${__dirname}\\webhook`, 'utf8')
 
+    if (!uuid) {
+        console.error('Missing UUID')
+        return
+    }
+
+    if (!webhookUrl) {
+        console.error('Missing webhook')
+        return
+    }
+
     switch (commandType) {
         case 'on':
         case 'off':
