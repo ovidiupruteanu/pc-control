@@ -3,24 +3,21 @@ import os from 'os'
 import http from 'http'
 import {URL} from 'url'
 import fs from 'fs'
-import fsp from "fs/promises";
-import {v4 as uuidv4} from "uuid";
+import fsp from 'fs/promises'
+import {v4 as uuidv4} from 'uuid'
 import {Server as SSDPServer} from 'node-ssdp'
+import {speaker} from 'win-audio'
+import webhook from "./webhook.js";
 
 const port = 57339
 
-const getUUID = () => {
-    return new Promise((resolve, reject) => {
-        fsp.access('uuid', fs.constants.F_OK).then(() => {
-            fsp.readFile('uuid', 'utf8').then(uuid => {
-                resolve(uuid)
-            })
-        }).catch(() => {
-            const uuid = uuidv4()
-            fsp.writeFile('uuid', new Uint8Array(Buffer.from(uuid)))
-            resolve(uuid)
-        })
-    })
+const getUUID = async () => {
+    try {
+        await fsp.access('uuid', fs.constants.F_OK)
+    } catch (err) {
+        await fsp.writeFile('uuid', uuidv4(), {encoding: 'utf8'})
+    }
+    return await fsp.readFile('uuid', 'utf8')
 }
 
 const uuid = await getUUID()
@@ -36,19 +33,19 @@ http.createServer((request, response) => {
             let ip, mac, interfaceName
 
             for (const [iName, addresses] of Object.entries(os.networkInterfaces())) {
-                addresses.forEach(address => {
+                for (const address of addresses) {
                     if (address.address === requestIP) {
                         interfaceName = iName
                         ip = address.address
                         mac = address.mac
                     }
-                })
+                }
             }
 
             response.setHeader('Content-Type', 'application/json')
             return response.end(JSON.stringify({
                 id: uuid,
-                name: process.env['COMPUTERNAME'],
+                name: process.env['COMPUTERNAME'] || os.hostname() || 'PC Control',
                 'interface': interfaceName,
                 ip, port, mac
             }))
@@ -117,9 +114,19 @@ http.createServer((request, response) => {
             return response.end(JSON.stringify({
                 pc: 'on',
                 display: 'on',
-                volume: 10,
-                mute: 'unmuted',
+                volume: speaker.get(),
+                mute: speaker.isMuted() ? 'muted' : 'unmuted',
             }))
+
+        case '/webhook/update':
+            const webhook = url.searchParams.get('url')
+            fsp.writeFile('webhook', webhook, {encoding: 'utf8'})
+            return response.end()
+
+        case '/webhook/delete':
+            fsp.writeFile('webhook', '', {encoding: 'utf8'})
+            return response.end()
+
         default:
             response.statusCode = 404
             return response.end('404 Not Found')
@@ -127,12 +134,23 @@ http.createServer((request, response) => {
     }
 
 
-}).listen(port, () => {
+}).listen(port)
+
+speaker.polling(400);
+
+speaker.events.on('change', (volume) => {
+    // console.log("old %d%% -> new %d%%", volume.old, volume.new)
+    webhook('volume', volume.new)
 })
 
+speaker.events.on('toggle', (status) => {
+    // console.log("muted: %s -> %s", status.old, status.new)
+    webhook(status.new ? 'mute' : 'unmute')
+})
 
 const ssdpServer = new SSDPServer({
     explicitSocketBind: true,
+    // interfaces: ['Ethernet'/*, 'Wi-Fi'*/],
     suppressRootDeviceAdvertisements: true,
     allowWildcards: false,
     adInterval: 60 * 1000,
@@ -140,7 +158,8 @@ const ssdpServer = new SSDPServer({
         port: port,
         path: '/discovery'
     },
-    udn: uuid
+    udn: uuid,
+    // customLogger: console.log
 })
 
 // server.addUSN('upnp:rootdevice')
