@@ -7,7 +7,7 @@ import fsp from 'fs/promises'
 import {v4 as uuidv4} from 'uuid'
 import {Server as SSDPServer} from 'node-ssdp'
 import {speaker} from 'win-audio'
-import webhook from "./webhook.js";
+// import webhook from "./webhook.js";
 
 const port = 57339
 
@@ -57,35 +57,35 @@ http.createServer((request, response) => {
             break
 
         case '/sleep':
-            exec('start nircmd standby')
+            exec('start nircmd standby', {windowsHide: true})
             return response.end('sleep')
 
         case '/lock':
-            exec('Rundll32.exe user32.dll,LockWorkStation')
+            exec('Rundll32.exe user32.dll,LockWorkStation', {windowsHide: true})
             return response.end('lock')
 
         case '/display/off':
-            exec('start nircmd monitor async_off')
+            exec('start nircmd monitor async_off', {windowsHide: true})
             return response.end('display off')
 
         case '/display/on':
-            exec('start nircmd sendkeypress ctrl')
+            exec('start nircmd sendkeypress ctrl', {windowsHide: true})
             return response.end('display on')
 
         case '/display/switch/external':
-            exec('DisplaySwitch.exe /external')
+            exec('DisplaySwitch.exe /external', {windowsHide: true})
             return response.end('display external')
 
         case '/display/switch/internal':
-            exec('DisplaySwitch.exe /internal')
+            exec('DisplaySwitch.exe /internal', {windowsHide: true})
             return response.end('display internal')
 
         case '/display/switch/extend':
-            exec('DisplaySwitch.exe /extend')
+            exec('DisplaySwitch.exe /extend', {windowsHide: true})
             return response.end('display extend')
 
         case '/display/switch/clone':
-            exec('DisplaySwitch.exe /clone')
+            exec('DisplaySwitch.exe /clone', {windowsHide: true})
             return response.end('display clone')
 
         case '/volume':
@@ -97,35 +97,33 @@ http.createServer((request, response) => {
             volume = Math.min(Math.max(volume, 0), 100)
             const sysVolume = Math.floor(65535 * volume / 100)
 
-            exec(`start nircmd setsysvolume ${sysVolume}`)
+            exec(`start nircmd setsysvolume ${sysVolume}`, {windowsHide: true})
 
             return response.end(`volume: ${volume}`)
 
         case '/mute':
-            exec(`start nircmd mutesysvolume 1`)
+            exec(`start nircmd mutesysvolume 1`, {windowsHide: true})
             return response.end('mute')
 
         case '/unmute':
-            exec(`start nircmd mutesysvolume 0`)
+            exec(`start nircmd mutesysvolume 0`, {windowsHide: true})
             return response.end('unmute')
 
         case '/status':
             response.setHeader('Content-Type', 'application/json')
             return response.end(JSON.stringify({
-                pc: 'on',
-                display: 'on',
                 volume: speaker.get(),
                 mute: speaker.isMuted() ? 'muted' : 'unmuted',
             }))
 
-        case '/webhook/update':
-            const webhook = url.searchParams.get('url')
-            fsp.writeFile('webhook', webhook, {encoding: 'utf8'})
-            return response.end()
-
-        case '/webhook/delete':
-            fsp.writeFile('webhook', '', {encoding: 'utf8'})
-            return response.end()
+        // case '/webhook/update':
+        //     const webhook = url.searchParams.get('url')
+        //     fsp.writeFile('webhook', webhook, {encoding: 'utf8'})
+        //     return response.end()
+        //
+        // case '/webhook/delete':
+        //     fsp.writeFile('webhook', '', {encoding: 'utf8'})
+        //     return response.end()
 
         default:
             response.statusCode = 404
@@ -136,17 +134,17 @@ http.createServer((request, response) => {
 
 }).listen(port)
 
-speaker.polling(400);
-
-speaker.events.on('change', (volume) => {
-    // console.log("old %d%% -> new %d%%", volume.old, volume.new)
-    webhook('volume', volume.new)
-})
-
-speaker.events.on('toggle', (status) => {
-    // console.log("muted: %s -> %s", status.old, status.new)
-    webhook(status.new ? 'mute' : 'unmute')
-})
+// speaker.polling(400);
+//
+// speaker.events.on('change', (volume) => {
+//     // console.log("old %d%% -> new %d%%", volume.old, volume.new)
+//     webhook('volume', volume.new)
+// })
+//
+// speaker.events.on('toggle', (status) => {
+//     // console.log("muted: %s -> %s", status.old, status.new)
+//     webhook(status.new ? 'mute' : 'unmute')
+// })
 
 const ssdpServer = new SSDPServer({
     explicitSocketBind: true,
