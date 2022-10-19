@@ -6,7 +6,6 @@ import fs from 'fs'
 import fsp from 'fs/promises'
 import {v4 as uuidv4} from 'uuid'
 import {Server as SSDPServer} from 'node-ssdp'
-import {speaker} from 'win-audio'
 // import webhook from "./webhook.js";
 
 const port = 57339
@@ -57,19 +56,19 @@ http.createServer((request, response) => {
             break
 
         case '/sleep':
-            exec('start nircmd standby', {windowsHide: true})
+            exec('pc-control sleep', {windowsHide: true})
             return response.end('sleep')
 
         case '/lock':
-            exec('Rundll32.exe user32.dll,LockWorkStation', {windowsHide: true})
+            exec('pc-control lock', {windowsHide: true})
             return response.end('lock')
 
         case '/display/off':
-            exec('start nircmd monitor async_off', {windowsHide: true})
+            exec('pc-control monitor off', {windowsHide: true})
             return response.end('display off')
 
         case '/display/on':
-            exec('start nircmd sendkeypress ctrl', {windowsHide: true})
+            exec('pc-control monitor on', {windowsHide: true})
             return response.end('display on')
 
         case '/display/switch/external':
@@ -95,26 +94,46 @@ http.createServer((request, response) => {
                 return response.end('Invalid volume')
             }
             volume = Math.min(Math.max(volume, 0), 100)
-            const sysVolume = Math.floor(65535 * volume / 100)
 
-            exec(`start nircmd setsysvolume ${sysVolume}`, {windowsHide: true})
+            exec(`pc-control volume ${volume}`, {windowsHide: true})
 
             return response.end(`volume: ${volume}`)
 
         case '/mute':
-            exec(`start nircmd mutesysvolume 1`, {windowsHide: true})
+            exec(`pc-control mute on`, {windowsHide: true})
             return response.end('mute')
 
         case '/unmute':
-            exec(`start nircmd mutesysvolume 0`, {windowsHide: true})
+            exec(`pc-control mute off`, {windowsHide: true})
             return response.end('unmute')
+
+        case '/media/play_pause':
+            exec(`pc-control media play_pause`, {windowsHide: true})
+            return response.end('media play_pause')
+
+        case '/media/stop':
+            exec(`pc-control media stop`, {windowsHide: true})
+            return response.end('media stop')
+
+        case '/media/next':
+            exec(`pc-control media next`, {windowsHide: true})
+            return response.end('media next')
+
+        case '/media/previous':
+            exec(`pc-control media previous`, {windowsHide: true})
+            return response.end('media previous')
 
         case '/status':
             response.setHeader('Content-Type', 'application/json')
-            return response.end(JSON.stringify({
-                volume: speaker.get(),
-                mute: speaker.isMuted() ? 'muted' : 'unmuted',
-            }))
+            exec('pc-control status', (error, stdout, stderr) => {
+                let status = stdout.trim().split(' ');
+                response.end(JSON.stringify({
+                    volume: status[0],
+                    mute: status[1] === 'on' ? 'muted' : 'unmuted',
+                }))
+            });
+
+            return
 
         // case '/webhook/update':
         //     const webhook = url.searchParams.get('url')
@@ -133,18 +152,6 @@ http.createServer((request, response) => {
 
 
 }).listen(port)
-
-// speaker.polling(400);
-//
-// speaker.events.on('change', (volume) => {
-//     // console.log("old %d%% -> new %d%%", volume.old, volume.new)
-//     webhook('volume', volume.new)
-// })
-//
-// speaker.events.on('toggle', (status) => {
-//     // console.log("muted: %s -> %s", status.old, status.new)
-//     webhook(status.new ? 'mute' : 'unmute')
-// })
 
 const ssdpServer = new SSDPServer({
     explicitSocketBind: true,

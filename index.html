@@ -15,7 +15,11 @@
 <a href="/display/switch/clone">Display Clone</a> <br/>
 <a href="/mute">Mute</a> <br/>
 <a href="/unmute">Unmute</a> <br/>
+<a href="/media/play_pause">Media Play/Pause</a> <br/>
+<a href="/media/stop">Media Stop</a> <br/>
+<a href="/media/next">Media Next</a> <br/>
+<a href="/media/previous">Media Previous</a> <br/>
 Volume <br/>
-<input type="range" min="0" max="100" />
+<input type="range" min="0" max="100" onchange="fetch('/volume?volume=' + this.value)"/>
 </body>
 </html>
