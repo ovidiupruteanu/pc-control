@@ -128,7 +128,7 @@ http.createServer((request, response) => {
             exec('pc-control status', (error, stdout, stderr) => {
                 let status = stdout.trim().split(' ');
                 response.end(JSON.stringify({
-                    volume: status[0],
+                    volume: Math.round(parseFloat(status[0])),
                     mute: status[1] === 'on' ? 'muted' : 'unmuted',
                 }))
             });
