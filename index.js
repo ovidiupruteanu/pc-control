@@ -60,7 +60,9 @@ http.createServer((request, response) => {
             return response.end('sleep')
 
         case '/lock':
-            exec('pc-control lock', {windowsHide: true})
+            // LockWorkStation only works on the active console session; the service runs in
+            // Session 0. Bridge via a scheduled task registered to run in the user session.
+            exec('schtasks /Run /TN "PCControlLock"', {windowsHide: true})
             return response.end('lock')
 
         case '/display/off':
