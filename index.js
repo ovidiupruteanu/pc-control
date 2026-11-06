@@ -6,9 +6,15 @@ import fs from 'fs'
 import fsp from 'fs/promises'
 import {v4 as uuidv4} from 'uuid'
 import {Server as SSDPServer} from 'node-ssdp'
+import tasks from './tasks.cjs'
 // import webhook from "./webhook.js";
 
 const port = 57339
+const {TASKS} = tasks
+
+// Lock and display calls don't reach the user's desktop from Session 0 (where the service
+// runs). Bridge via scheduled tasks registered to run in the user session (see tasks.cjs).
+const runTask = (task) => exec(`schtasks /Run /TN "${task.name}"`, {windowsHide: true})
 
 const getUUID = async () => {
     try {
@@ -60,17 +66,15 @@ http.createServer((request, response) => {
             return response.end('sleep')
 
         case '/lock':
-            // LockWorkStation only works on the active console session; the service runs in
-            // Session 0. Bridge via a scheduled task registered to run in the user session.
-            exec('schtasks /Run /TN "PCControlLock"', {windowsHide: true})
+            runTask(TASKS.lock)
             return response.end('lock')
 
         case '/display/off':
-            exec('pc-control monitor off', {windowsHide: true})
+            runTask(TASKS.displayOff)
             return response.end('display off')
 
         case '/display/on':
-            exec('pc-control monitor on', {windowsHide: true})
+            runTask(TASKS.displayOn)
             return response.end('display on')
 
         case '/display/switch/external':

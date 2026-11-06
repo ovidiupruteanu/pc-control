@@ -1,12 +1,15 @@
 const path = require('path')
 const { execFileSync } = require('child_process')
 const { Service } = require('node-windows')
+const { TASKS } = require('./tasks.cjs')
 
-function unregisterLockTask() {
-    try {
-        execFileSync('schtasks', ['/Delete', '/TN', 'PCControlLock', '/F'], { stdio: 'inherit' })
-    } catch (err) {
-        // Task may not exist; not fatal.
+function unregisterTasks() {
+    for (const {name} of Object.values(TASKS)) {
+        try {
+            execFileSync('schtasks', ['/Delete', '/TN', name, '/F'], { stdio: 'inherit' })
+        } catch (err) {
+            // Task may not exist; not fatal.
+        }
     }
 }
 
@@ -16,11 +19,11 @@ const svc = new Service({
 })
 
 svc.on('uninstall', () => {
-    unregisterLockTask()
+    unregisterTasks()
     console.log('Service uninstalled.')
 })
 svc.on('alreadyuninstalled', () => {
-    unregisterLockTask()
+    unregisterTasks()
     console.log('Service is not installed.')
 })
 svc.on('error', (err) => console.error('Service error:', err))

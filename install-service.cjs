@@ -2,6 +2,7 @@ const os = require('os')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const { Service } = require('node-windows')
+const { TASKS } = require('./tasks.cjs')
 
 const password = process.env.SERVICE_PASSWORD
 if (!password) {
@@ -17,26 +18,29 @@ if (!password) {
 const account = process.env.SERVICE_ACCOUNT || os.userInfo().username
 const domain = process.env.SERVICE_DOMAIN || os.hostname()
 
-function registerLockTask() {
-    // The service runs in Session 0, where LockWorkStation fails. This scheduled task
-    // is invoked by the /lock route via `schtasks /Run`; /IT makes it run interactively
-    // in the user's session, which is where LockWorkStation actually works.
-    try {
-        execFileSync('schtasks', [
-            '/Create',
-            '/TN', 'PCControlLock',
-            '/TR', 'rundll32.exe user32.dll,LockWorkStation',
-            '/SC', 'ONCE',
-            '/ST', '00:00',
-            '/SD', '01/01/2099',
-            '/RU', `${domain}\\${account}`,
-            '/IT',
-            '/F',
-        ], { stdio: 'inherit' })
-        console.log('Scheduled task "PCControlLock" registered.')
-    } catch (err) {
-        console.error('Failed to register PCControlLock scheduled task:', err.message)
-        console.error('The service will install, but /lock will not work until this task exists.')
+function registerTasks() {
+    // The service runs in Session 0, where lock and display calls don't reach the user's
+    // desktop. These tasks are invoked by the matching routes via `schtasks /Run`; /IT makes
+    // them run interactively in the user's session, where those calls actually work.
+    for (const {name, command, highest} of Object.values(TASKS)) {
+        try {
+            execFileSync('schtasks', [
+                '/Create',
+                '/TN', name,
+                '/TR', command,
+                '/SC', 'ONCE',
+                '/ST', '00:00',
+                '/SD', '01/01/2099',
+                '/RU', `${domain}\\${account}`,
+                '/IT',
+                ...(highest ? ['/RL', 'HIGHEST'] : []),
+                '/F',
+            ], { stdio: 'inherit' })
+            console.log(`Scheduled task "${name}" registered.`)
+        } catch (err) {
+            console.error(`Failed to register ${name} scheduled task:`, err.message)
+            console.error('The service will install, but the route using this task will not work until it exists.')
+        }
     }
 }
 
@@ -50,12 +54,12 @@ const svc = new Service({
 
 svc.on('install', () => {
     console.log(`Installed. Starting service as ${domain}\\${account}...`)
-    registerLockTask()
+    registerTasks()
     svc.start()
 })
 svc.on('alreadyinstalled', () => {
     console.log('Service is already installed.')
-    registerLockTask()
+    registerTasks()
 })
 svc.on('start', () => console.log('Service started.'))
 svc.on('error', (err) => console.error('Service error:', err))

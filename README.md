@@ -22,21 +22,21 @@ To remove:
 npm run uninstall-service
 ```
 
-## Lock command
+## Lock and display commands
 
-The `/lock` endpoint requires a one-time scheduled task because Windows services run in Session 0, where `LockWorkStation` is a no-op. `npm run install-service` creates it automatically. If you installed before this was added, register it manually once (elevated shell):
+Windows services run in Session 0, which can't reach your desktop. So these endpoints each trigger a scheduled task that runs in your session instead:
 
-PowerShell:
-```powershell
-schtasks /Create /TN "PCControlLock" /TR "rundll32.exe user32.dll,LockWorkStation" /SC ONCE /ST 00:00 /SD 01/01/2099 /RU "$env:USERDOMAIN\$env:USERNAME" /IT /F
-```
+| Task | Endpoint |
+| --- | --- |
+| `PCControlLock` | `/lock` |
+| `PCControlDisplayOff` | `/display/off` |
+| `PCControlDisplayOn` | `/display/on` (runs with highest privileges, so it still works while an elevated window has focus) |
 
-Git Bash:
-```bash
-schtasks //Create //TN "PCControlLock" //TR "rundll32.exe user32.dll,LockWorkStation" //SC ONCE //ST 00:00 //SD 01/01/2099 //RU "$USERDOMAIN\\$USERNAME" //IT //F
-```
+`npm run install-service` creates them. If you installed before a task was added, run `npm run install-service` again: on an installed service it only re-registers the tasks. `npm run uninstall-service` removes them.
 
-`npm run uninstall-service` removes the task too.
+The tasks only run while you're logged on. The display tasks run `pc-control.exe` from the project folder by full path, so re-run the install if you move the folder.
+
+The `/display/switch/*` endpoints call `DisplaySwitch.exe` directly, so they only work when running with `npm start`, not as a service.
 
 ## Start / stop
 
